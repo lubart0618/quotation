@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>即時報價系統</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="shell quote-shell">
+      <section class="hero compact">
+        <div class="hero-copy">
+          <p class="eyebrow">Live Quote Builder</p>
+          <h1>左邊調整，右邊即時更新的報價系統</h1>
+          <p class="lead">
+            適合先快速確認報價內容與金額。你可以直接修改客戶資訊、品項與稅率，
+            右側會同步更新報價單預覽。
+          </p>
+          <div class="hero-actions">
+            <button class="button primary" id="print-quote" type="button">一鍵輸出 PDF</button>
+            <button class="button secondary" id="save-quote" type="button">儲存本次報價</button>
+            <button class="button ghost" id="download-quote" type="button">下載 JSON</button>
+            <a class="button secondary" href="{{ url_for('index') }}">回首頁</a>
+          </div>
+        </div>
+      </section>
+
+      <div class="alert success quote-status" id="quote-status" hidden>報價已儲存。</div>
+
+      <section class="quote-layout">
+        <article class="panel quote-config">
+          <div class="panel-heading">
+            <div>
+              <p class="section-label">Editor</p>
+              <h2>報價內容設定</h2>
+            </div>
+          </div>
+
+          <form class="data-form quote-form" id="quote-form">
+            <label>
+              <span>報價單號</span>
+              <input id="quote-number" type="text" value="QT-20260415-001">
+            </label>
+            <label>
+              <span>報價日期</span>
+              <input id="quote-date" type="date" value="2026-04-15">
+            </label>
+            <label>
+              <span>公司名稱</span>
+              <input id="company-name" type="text" value="晨光創意有限公司">
+            </label>
+            <label>
+              <span>聯絡人</span>
+              <input id="contact-name" type="text" value="王小姐">
+            </label>
+            <label>
+              <span>電話</span>
+              <input id="contact-phone" type="text" value="">
+            </label>
+            <label class="wide">
+              <span>客戶地址</span>
+              <input id="company-address" type="text" value="桃園市中壢區新生路 88 號 5 樓">
+            </label>
+            <label class="wide">
+              <span>專案執行人</span>
+              <input id="executor" type="text" value="">
+            </label>
+            <label>
+              <span>稅率 (%)</span>
+              <input id="tax-rate" type="number" min="0" value="5">
+            </label>
+            <label class="wide">
+              <span>付款方式</span>
+              <textarea id="payment-terms" rows="6">戶名 : 政大企業有限公司
+
+銀行名稱 : 中國信託銀行
+
+銀行代號 : 822
+
+戶頭 : 495540630985
+
+分行名稱 : 中原分行</textarea>
+            </label>
+          </form>
+
+          <div class="line-items-block">
+            <div class="panel-heading">
+              <div>
+                <p class="section-label">Items</p>
+                <h2>報價品項</h2>
+              </div>
+              <button class="button secondary" id="add-item" type="button">新增品項</button>
+            </div>
+            <div class="line-items" id="line-items"></div>
+          </div>
+        </article>
+
+        <article class="panel quote-preview-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-label">Preview</p>
+              <h2>即時報價預覽</h2>
+            </div>
+          </div>
+
+          <section class="quote-preview" id="quote-preview">
+            <div class="quote-paper">
+              <header class="quote-paper-head">
+                <div class="quote-header-main">
+                  {% if logo_exists %}
+                  <img class="quote-logo" src="{{ url_for('quote_logo') }}" alt="巴哥來了 Logo">
+                  {% endif %}
+                  <h3>專案報價單</h3>
+                </div>
+                <div class="quote-meta">
+                  <p><span>報價單號</span><strong id="preview-number"></strong></p>
+                  <p><span>日期</span><strong id="preview-date"></strong></p>
+                  <p><span>報價有效期</span><strong id="preview-valid-until"></strong></p>
+                </div>
+              </header>
+
+              <section class="quote-customer">
+                <div>
+                  <p class="quote-muted">客戶資訊</p>
+                  <strong id="preview-company"></strong>
+                  <p id="preview-contact"></p>
+                  <p id="preview-phone"></p>
+                  <p id="preview-address"></p>
+                </div>
+              </section>
+
+              <section class="quote-table-wrap">
+                <table class="quote-table">
+                  <thead>
+                    <tr>
+                      <th>項目</th>
+                      <th>數量</th>
+                      <th>單價</th>
+                      <th>小計</th>
+                    </tr>
+                  </thead>
+                  <tbody id="preview-items"></tbody>
+                </table>
+              </section>
+
+              <section class="quote-summary">
+                <div class="summary-notes quote-footer-card">
+                  <p class="quote-muted">報價提供者</p>
+                  <p>公司名稱：{{ provider.company_name }}</p>
+                  <p>統編：{{ provider.company_id }}</p>
+                  <p>地址：{{ provider.address }}</p>
+                  <p>電話：{{ provider.phone }}</p>
+                  <p>專案執行人：<span class="fillable-line" id="preview-executor"></span></p>
+                </div>
+                <div class="summary-notes quote-footer-card">
+                  <p class="quote-muted">付款方式</p>
+                  <p id="preview-payment"></p>
+                </div>
+                <div class="summary-card">
+                  <p><span>小計</span><strong id="subtotal-value"></strong></p>
+                  <p><span>稅額</span><strong id="tax-value"></strong></p>
+                  <p class="grand-total"><span>總金額</span><strong id="grand-total-value"></strong></p>
+                </div>
+              </section>
+
+              <section class="quote-signoff">
+                <div class="quote-sign-box">
+                  <p>客戶用印處</p>
+                </div>
+              </section>
+            </div>
+          </section>
+        </article>
+      </section>
+    </main>
+
+    <template id="line-item-template">
+      <article class="line-item-card">
+        <label>
+          <span>品項名稱</span>
+          <input class="item-name" type="text" value="網站首頁設計">
+        </label>
+        <label>
+          <span>數量</span>
+          <input class="item-qty" type="number" min="1" value="1">
+        </label>
+        <label>
+          <span>單價</span>
+          <input class="item-price" type="number" min="0" value="18000">
+        </label>
+        <button class="button ghost remove-item" type="button">移除</button>
+      </article>
+    </template>
+
+    <script>
+      const STORAGE_KEY = "live-quote-builder-v2";
+      const lineItemsContainer = document.querySelector("#line-items");
+      const addItemButton = document.querySelector("#add-item");
+      const template = document.querySelector("#line-item-template");
+      const statusMessage = document.querySelector("#quote-status");
+      const saveButton = document.querySelector("#save-quote");
+      const printButton = document.querySelector("#print-quote");
+      const downloadButton = document.querySelector("#download-quote");
+
+      const formatCurrency = (value) =>
+        new Intl.NumberFormat("zh-TW", {
+          style: "currency",
+          currency: "TWD",
+          maximumFractionDigits: 0,
+        }).format(value || 0);
+
+      const flashStatus = (message) => {
+        statusMessage.textContent = message;
+        statusMessage.hidden = false;
+        window.clearTimeout(flashStatus.timer);
+        flashStatus.timer = window.setTimeout(() => {
+          statusMessage.hidden = true;
+        }, 2400);
+      };
+
+      const createItem = (preset = {}) => {
+        const node = template.content.firstElementChild.cloneNode(true);
+        node.querySelector(".item-name").value = preset.name || "網站首頁設計";
+        node.querySelector(".item-qty").value = preset.qty || 1;
+        node.querySelector(".item-price").value = preset.price || 18000;
+
+        node.querySelectorAll("input").forEach((input) => {
+          input.addEventListener("input", renderQuote);
+        });
+
+        node.querySelector(".remove-item").addEventListener("click", () => {
+          node.remove();
+          renderQuote();
+        });
+
+        lineItemsContainer.appendChild(node);
+      };
+
+      const getNumber = (selector) => Number(document.querySelector(selector).value || 0);
+      const getValue = (selector) => document.querySelector(selector).value.trim();
+      const getItemRows = () => [...document.querySelectorAll(".line-item-card")];
+
+      const collectQuoteData = () => ({
+        quoteNumber: getValue("#quote-number"),
+        quoteDate: getValue("#quote-date"),
+        validUntil: document.querySelector("#preview-valid-until").textContent.trim(),
+        companyName: getValue("#company-name"),
+        contactName: getValue("#contact-name"),
+        contactPhone: getValue("#contact-phone"),
+        companyAddress: getValue("#company-address"),
+        executor: getValue("#executor"),
+        taxRate: getNumber("#tax-rate"),
+        paymentTerms: getValue("#payment-terms"),
+        items: getItemRows().map((row) => ({
+          name: row.querySelector(".item-name").value.trim(),
+          qty: Number(row.querySelector(".item-qty").value || 0),
+          price: Number(row.querySelector(".item-price").value || 0),
+        })),
+      });
+
+      const replaceItems = (items) => {
+        lineItemsContainer.innerHTML = "";
+        items.forEach((item) => createItem(item));
+      };
+
+      const applyQuoteData = (data) => {
+        if (!data) return;
+        document.querySelector("#quote-number").value = data.quoteNumber || "";
+        document.querySelector("#quote-date").value = data.quoteDate || "";
+        document.querySelector("#company-name").value = data.companyName || "";
+        document.querySelector("#contact-name").value = data.contactName || "";
+        document.querySelector("#contact-phone").value = data.contactPhone || "";
+        document.querySelector("#company-address").value = data.companyAddress || "";
+        document.querySelector("#executor").value = data.executor || "";
+        document.querySelector("#tax-rate").value = data.taxRate ?? 5;
+        document.querySelector("#payment-terms").value = data.paymentTerms || document.querySelector("#payment-terms").value;
+        replaceItems(data.items?.length ? data.items : []);
+      };
+
+      const saveQuote = () => {
+        const payload = collectQuoteData();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        flashStatus("報價已儲存到這台電腦的瀏覽器。");
+      };
+
+      const downloadQuote = () => {
+        const payload = collectQuoteData();
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${payload.quoteNumber || "quote"}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const exportPdf = async () => {
+        const payload = collectQuoteData();
+        const response = await fetch("/quote/export-pdf", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error("PDF export failed");
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${payload.quoteNumber || "quote"}.pdf`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const renderQuote = () => {
+        const quoteDateValue = getValue("#quote-date");
+        const validUntilText = (() => {
+          if (!quoteDateValue) return "";
+          const date = new Date(`${quoteDateValue}T00:00:00`);
+          if (Number.isNaN(date.getTime())) return "";
+          date.setDate(date.getDate() + 7);
+          return date.toISOString().slice(0, 10);
+        })();
+
+        document.querySelector("#preview-number").textContent = getValue("#quote-number");
+        document.querySelector("#preview-date").textContent = quoteDateValue;
+        document.querySelector("#preview-valid-until").textContent = validUntilText;
+        document.querySelector("#preview-company").textContent = getValue("#company-name");
+        document.querySelector("#preview-contact").textContent = getValue("#contact-name");
+        document.querySelector("#preview-phone").textContent = getValue("#contact-phone");
+        document.querySelector("#preview-address").textContent = getValue("#company-address");
+        document.querySelector("#preview-executor").textContent = getValue("#executor") || "　　     　";
+        document.querySelector("#preview-payment").textContent = getValue("#payment-terms");
+
+        const rows = [...document.querySelectorAll(".line-item-card")];
+        const previewBody = document.querySelector("#preview-items");
+        previewBody.innerHTML = "";
+
+        const subtotal = rows.reduce((total, row) => {
+          const name = row.querySelector(".item-name").value.trim();
+          const qty = Number(row.querySelector(".item-qty").value || 0);
+          const price = Number(row.querySelector(".item-price").value || 0);
+          const amount = qty * price;
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${name}</td>
+            <td>${qty}</td>
+            <td>${formatCurrency(price)}</td>
+            <td>${formatCurrency(amount)}</td>
+          `;
+          previewBody.appendChild(tr);
+
+          return total + amount;
+        }, 0);
+
+        const taxRate = getNumber("#tax-rate") / 100;
+        const tax = Math.round(subtotal * taxRate);
+        const total = subtotal + tax;
+
+        document.querySelector("#subtotal-value").textContent = formatCurrency(subtotal);
+        document.querySelector("#tax-value").textContent = formatCurrency(tax);
+        document.querySelector("#grand-total-value").textContent = formatCurrency(total);
+      };
+
+      [
+        "#quote-number",
+        "#quote-date",
+        "#company-name",
+        "#contact-name",
+        "#contact-phone",
+        "#company-address",
+        "#executor",
+        "#tax-rate",
+        "#payment-terms"
+      ].forEach((selector) => {
+        document.querySelector(selector).addEventListener("input", renderQuote);
+      });
+
+      addItemButton.addEventListener("click", () => {
+        createItem({
+          name: "新增服務項目",
+          desc: "請填寫這個品項的內容與範圍",
+          qty: 1,
+          price: 5000,
+        });
+        renderQuote();
+      });
+
+      saveButton.addEventListener("click", saveQuote);
+      printButton.addEventListener("click", async () => {
+        try {
+          await exportPdf();
+          flashStatus("PDF 已開始下載。");
+        } catch (error) {
+          flashStatus("PDF 產生失敗，請稍後再試。");
+        }
+      });
+      downloadButton.addEventListener("click", downloadQuote);
+
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          applyQuoteData(JSON.parse(stored));
+        } catch (error) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } else {
+        createItem({
+          name: "網站首頁設計",
+          desc: "含首頁視覺提案、RWD 切版與基本互動效果",
+          qty: 1,
+          price: 18000,
+        });
+        createItem({
+          name: "內頁版型設計",
+          desc: "服務頁、關於我們、聯絡頁版型統一設計",
+          qty: 3,
+          price: 6000,
+        });
+        createItem({
+          name: "表單與基本串接",
+          desc: "含聯絡表單、寄信通知與基本後台欄位設定",
+          qty: 1,
+          price: 12000,
+        });
+      }
+      renderQuote();
+    </script>
+  </body>
+</html>

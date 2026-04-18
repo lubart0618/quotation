@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>排班結果</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero compact">
+        <div class="hero-copy">
+          <p class="eyebrow">Planner Output</p>
+          <h1>網站版排班結果</h1>
+          <p class="lead">這一頁就是主管人工複核用的快速檢視版。</p>
+          <div class="hero-actions">
+            <a class="button secondary" href="{{ url_for('index') }}">回到控制台</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat-card">
+          <p class="stat-label">成功排入</p>
+          <p class="stat-value">{{ stats.assignments }}</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">未補齊</p>
+          <p class="stat-value">{{ stats.unfilled }}</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-label">場次數量</p>
+          <p class="stat-value">{{ stats.events }}</p>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Assignments</p>
+            <h2>已安排名單</h2>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>場次</th>
+                <th>日期</th>
+                <th>時段</th>
+                <th>賣場</th>
+                <th>品牌</th>
+                <th>類別</th>
+                <th>人員</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in assignments %}
+              <tr>
+                <td>{{ row.event_id }}</td>
+                <td>{{ row.date }}</td>
+                <td>{{ row.slot }}</td>
+                <td>{{ row.store }}</td>
+                <td>{{ row.brand }}</td>
+                <td>{{ row.category }}</td>
+                <td>{{ row.employee_name }} ({{ row.employee_id }})</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Unfilled</p>
+            <h2>缺額提醒</h2>
+          </div>
+        </div>
+        {% if unfilled %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>場次</th>
+                <th>日期</th>
+                <th>時段</th>
+                <th>賣場</th>
+                <th>品牌</th>
+                <th>缺額</th>
+                <th>原因</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in unfilled %}
+              <tr>
+                <td>{{ row.event_id }}</td>
+                <td>{{ row.date }}</td>
+                <td>{{ row.slot }}</td>
+                <td>{{ row.store }}</td>
+                <td>{{ row.brand }}</td>
+                <td>{{ row.missing_seat }}</td>
+                <td>{{ row.reason }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="empty-state">目前全部場次都已補齊。</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">Summary</p>
+            <h2>人員班次摘要</h2>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>人員編號</th>
+                <th>姓名</th>
+                <th>已排班次</th>
+                <th>上限</th>
+                <th>適合類別</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in summary %}
+              <tr>
+                <td>{{ row.employee_id }}</td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.assigned_shifts }}</td>
+                <td>{{ row.weekly_max_shifts }}</td>
+                <td>{{ row.groups }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

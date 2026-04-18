@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ meta_title }}</title>
+    <meta name="description" content="{{ meta_description }}">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ site_url }}/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ meta_title }}">
+    <meta property="og:description" content="{{ meta_description }}">
+    <meta property="og:url" content="{{ site_url }}/">
+    <meta property="og:locale" content="zh_TW">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script type="application/ld+json">{{ local_business_schema | tojson(indent=2) }}</script>
+    <script type="application/ld+json">{{ faq_schema | tojson(indent=2) }}</script>
+  </head>
+  <body class="marketing-body">
+    <header class="site-nav">
+      <div class="nav-inner">
+        <a class="brand" href="#top">{{ site_name }}</a>
+        <nav class="nav-links">
+          <a href="#services">服務內容</a>
+          <a href="#process">執行流程</a>
+          <a href="#faq">常見問題</a>
+          <a href="{{ url_for('quote_builder') }}">即時報價</a>
+          <a class="nav-cta" href="#contact">預約諮詢</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="landing-hero">
+        <div class="hero-pane">
+          <p class="kicker">Zhongli Local SEO Studio</p>
+          <h1>幫中壢店家把「被找到」做成穩定成長的系統</h1>
+          <p class="hero-intro">
+            這不是只有做網站，而是把中壢在地搜尋需求、Google 商家優化、服務頁文案與轉換設計整合在一起，
+            讓你的品牌在「中壢推薦」「附近店家」「桃園中壢服務」這類搜尋裡更容易出現。
+          </p>
+          <div class="tag-row">
+            {% for tag in hero_tags %}
+            <span>{{ tag }}</span>
+            {% endfor %}
+          </div>
+          <div class="hero-cta-row">
+            <a class="button primary" href="#contact">預約 30 分鐘諮詢</a>
+            <a class="button ghost" href="#services">先看服務內容</a>
+          </div>
+        </div>
+        <aside class="hero-proof">
+          <p class="proof-title">為什麼中壢品牌需要在地 SEO</p>
+          <ul class="proof-list">
+            <li>中壢實體店與服務業大量依賴地區型搜尋與 Google 地圖曝光。</li>
+            <li>同業很多只有做廣告，沒有累積自然排名資產。</li>
+            <li>服務頁與 FAQ 做對了，詢問品質會比單純導流更穩。</li>
+          </ul>
+          <div class="proof-grid">
+            {% for item in proof_points %}
+            <article>
+              <strong>{{ item.value }}</strong>
+              <span>{{ item.label }}</span>
+            </article>
+            {% endfor %}
+          </div>
+        </aside>
+      </section>
+
+      <section class="section-block district-band">
+        <div class="section-head">
+          <p class="section-kicker">Coverage</p>
+          <h2>從中壢主城區到青埔，我們把服務範圍直接做進網站結構</h2>
+        </div>
+        <div class="district-chips">
+          {% for district in districts %}
+          <span>{{ district }}</span>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="section-block" id="services">
+        <div class="section-head">
+          <p class="section-kicker">Services</p>
+          <h2>適合中壢在地經營的 SEO 網站內容</h2>
+          <p>我們把搜尋能見度、內容可讀性與轉單導向一起考量，不做只有視覺沒有流量的網站。</p>
+        </div>
+        <div class="service-grid">
+          {% for card in service_cards %}
+          <article class="service-card">
+            <p class="card-kicker">{{ card.eyebrow }}</p>
+            <h3>{{ card.title }}</h3>
+            <p>{{ card.body }}</p>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="section-block split-layout" id="process">
+        <div class="section-head narrow">
+          <p class="section-kicker">Process</p>
+          <h2>從關鍵字策略到上線後追蹤，流程一次講清楚</h2>
+          <p>如果你希望這個網站後續能持續更新，我們會優先把最有機會帶來詢問的頁面先做好。</p>
+        </div>
+        <div class="step-stack">
+          {% for step in process_steps %}
+          <article class="step-card">
+            <span>0{{ loop.index }}</span>
+            <p>{{ step }}</p>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="section-block content-panel">
+        <div class="section-head">
+          <p class="section-kicker">What This Site Targets</p>
+          <h2>這個網站已經內建中壢在地 SEO 的基礎訊號</h2>
+        </div>
+        <div class="content-columns">
+          <article>
+            <h3>搜尋引擎看得到</h3>
+            <ul>
+              <li>首頁標題與描述鎖定中壢 SEO、Google 商家優化與網站自然排名。</li>
+              <li>加入 `ProfessionalService` 與 `FAQPage` 結構化資料。</li>
+              <li>內容中自然帶入中壢、內壢、青埔、平鎮等服務區域。</li>
+            </ul>
+          </article>
+          <article>
+            <h3>客戶也看得懂</h3>
+            <ul>
+              <li>先說清楚中壢品牌為什麼要做在地 SEO，而不是只談技術名詞。</li>
+              <li>用服務內容、流程與 FAQ 幫助潛在客戶快速建立信任。</li>
+              <li>保留明確 CTA，適合後續接表單、LINE 或電話轉換。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block faq-panel" id="faq">
+        <div class="section-head">
+          <p class="section-kicker">FAQ</p>
+          <h2>中壢在地 SEO 常見問題</h2>
+        </div>
+        <div class="faq-list">
+          {% for item in faq_items %}
+          <details class="faq-item" {% if loop.first %}open{% endif %}>
+            <summary>{{ item.question }}</summary>
+            <p>{{ item.answer }}</p>
+          </details>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="section-block contact-panel" id="contact">
+        <div>
+          <p class="section-kicker">Contact</p>
+          <h2>想做中壢在地經營 SEO，先把你的產業與服務區域整理給我們</h2>
+          <p>
+            我們可以先幫你盤點目前網站、Google 商家與主要競爭對手，再決定要先做首頁、服務頁、地區頁，
+            還是先補商家檔案與 FAQ 內容。
+          </p>
+        </div>
+        <div class="contact-card">
+          <p><strong>電話：</strong>{{ site_phone }}</p>
+          <p><strong>地址：</strong>{{ site_address }}</p>
+          <p><strong>服務主軸：</strong>中壢 SEO、在地商家網站、Google 商家優化、內容策略</p>
+          <a class="button primary full" href="tel:{{ site_phone | replace('-', '') }}">立即撥打諮詢</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
