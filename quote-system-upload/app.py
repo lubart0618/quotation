@@ -6,7 +6,7 @@ from pathlib import Path
 from io import BytesIO
 
 from flask import Flask, make_response, redirect, render_template, request, send_file, url_for
-from PIL import Image as PILImage, ImageOps
+from PIL import Image as PILImage, ImageDraw, ImageFont, ImageOps
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -579,6 +579,165 @@ def build_quote_pdf(data: dict) -> bytes:
     story.extend([summary_table, Spacer(1, 12), footer_table])
 
     doc.build(story)
+    return buffer.getvalue()
+
+
+def build_quote_pdf(data: dict) -> bytes:
+    """Render the quote as an image-based PDF to avoid CJK font encoding issues on cloud hosts."""
+    width, height = 1240, 1754
+    image = PILImage.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+
+    font_path = str(CJK_FONT_PATH)
+    title_font = ImageFont.truetype(font_path, 42)
+    heading_font = ImageFont.truetype(font_path, 26)
+    body_font = ImageFont.truetype(font_path, 23)
+    small_font = ImageFont.truetype(font_path, 21)
+    number_font = ImageFont.truetype(font_path, 22)
+
+    ink = "#1f1b16"
+    muted = "#5c554f"
+    brand = "#7a3614"
+    line = "#dacabd"
+    fill = "#f4e8dc"
+
+    def text(x: int, y: int, value: str, font=body_font, color=ink, anchor: str | None = None) -> None:
+        draw.text((x, y), value, font=font, fill=color, anchor=anchor)
+
+    def rect(x1: int, y1: int, x2: int, y2: int, outline=line, fill_color=None, width_px: int = 1) -> None:
+        draw.rectangle((x1, y1, x2, y2), outline=outline, fill=fill_color, width=width_px)
+
+    def spaced_digits(value: str) -> str:
+        chars: list[str] = []
+        for index, char in enumerate(value):
+            chars.append(char)
+            if index < len(value) - 1 and char.isdigit() and value[index + 1].isdigit():
+                chars.append(" ")
+        return "".join(chars)
+
+    def spaced_text_numbers(value: str) -> str:
+        return re.sub(r"\d[\d,.-]*", lambda match: spaced_digits(match.group(0)), value)
+
+    def currency(value: int | float) -> str:
+        return f"NT$ {spaced_digits(f'{value:,.0f}')}"
+
+    def draw_lines(x: int, y: int, lines: list[str], font=body_font, gap: int = 36, color=ink) -> None:
+        for index, line_text in enumerate(lines):
+            text(x, y + index * gap, line_text, font=font, color=color)
+
+    items = data.get("items", [])
+    subtotal = sum((item.get("qty", 0) or 0) * (item.get("price", 0) or 0) for item in items)
+    tax_rate = max(float(data.get("taxRate", 0) or 0), 0)
+    tax = round(subtotal * (tax_rate / 100))
+    total = subtotal + tax
+
+    logo_bytes = build_round_logo_bytes(512)
+    if logo_bytes:
+        logo = PILImage.open(BytesIO(logo_bytes)).convert("RGBA").resize((118, 118), PILImage.Resampling.LANCZOS)
+        image.paste(logo, ((width - 118) // 2, 70), logo)
+        title_y = 210
+    else:
+        title_y = 105
+
+    text(width // 2, title_y, "專案報價單", font=title_font, color=brand, anchor="mm")
+
+    # Customer and quote metadata
+    box_x1, box_y1, box_x2, box_y2 = 90, 270, 1150, 420
+    rect(box_x1, box_y1, box_x2, box_y2)
+    draw.line((620, box_y1, 620, box_y2), fill=line, width=1)
+    left_lines = [
+        f"客戶： {data.get('companyName', '')}",
+        f"聯絡人： {data.get('contactName', '')}",
+        f"電話： {spaced_text_numbers(data.get('contactPhone', ''))}",
+        f"地址： {spaced_text_numbers(data.get('companyAddress', ''))}",
+    ]
+    right_lines = [
+        f"報價單號： {spaced_text_numbers(data.get('quoteNumber', ''))}",
+        f"日期： {spaced_text_numbers(data.get('quoteDate', ''))}",
+        f"報價有效期： {spaced_text_numbers(data.get('validUntil', ''))}",
+        f"稅率： {spaced_text_numbers(f'{tax_rate:.0f}%')}",
+    ]
+    draw_lines(118, 295, left_lines, gap=32)
+    draw_lines(660, 295, right_lines, gap=32)
+
+    # Line item table
+    table_x, table_y = 90, 455
+    col_widths = [610, 140, 185, 185]
+    row_h = 72
+    table_w = sum(col_widths)
+    rect(table_x, table_y, table_x + table_w, table_y + row_h, fill_color=fill)
+    headers = ["項目", "數量", "單價", "小計"]
+    x = table_x
+    for i, header in enumerate(headers):
+        text(x + 24, table_y + 24, header, font=heading_font)
+        if i:
+            draw.line((x, table_y, x, table_y + row_h * (len(items) + 1)), fill=line, width=1)
+        x += col_widths[i]
+
+    y = table_y + row_h
+    for item in items:
+        rect(table_x, y, table_x + table_w, y + row_h)
+        qty = item.get("qty", 0) or 0
+        price = item.get("price", 0) or 0
+        amount = qty * price
+        values = [
+            str(item.get("name", "")),
+            spaced_digits(str(qty)),
+            currency(price),
+            currency(amount),
+        ]
+        x = table_x
+        for i, value in enumerate(values):
+            if i in (2, 3):
+                text(x + col_widths[i] - 24, y + 24, value, font=number_font, color=muted, anchor="ra")
+            else:
+                text(x + 24, y + 24, value, font=body_font, color=muted)
+            x += col_widths[i]
+        y += row_h
+
+    # Summary table
+    summary_x, summary_y = 660, y + 48
+    summary_col_w = [230, 305]
+    summary_row_h = 64
+    rows = [("小計", currency(subtotal)), ("稅額", currency(tax)), ("總金額", currency(total))]
+    for index, (label, value) in enumerate(rows):
+        row_y = summary_y + index * summary_row_h
+        rect(summary_x, row_y, summary_x + sum(summary_col_w), row_y + summary_row_h, fill_color=fill if index == 2 else None)
+        draw.line((summary_x + summary_col_w[0], row_y, summary_x + summary_col_w[0], row_y + summary_row_h), fill=line, width=1)
+        text(summary_x + 24, row_y + 20, label, font=body_font, color=brand if index == 2 else ink)
+        text(summary_x + sum(summary_col_w) - 24, row_y + 20, value, font=number_font, color=brand if index == 2 else ink, anchor="ra")
+
+    # Footer panels
+    footer_x, footer_y, footer_w, footer_h = 90, summary_y + 250, 1060, 250
+    rect(footer_x, footer_y, footer_x + footer_w, footer_y + footer_h)
+    panel_w = footer_w // 3
+    draw.line((footer_x + panel_w, footer_y, footer_x + panel_w, footer_y + footer_h), fill=line, width=1)
+    draw.line((footer_x + panel_w * 2, footer_y, footer_x + panel_w * 2, footer_y + footer_h), fill=line, width=1)
+
+    provider_lines = [
+        "報價提供者",
+        f"公司名稱： {QUOTE_PROVIDER['company_name']}",
+        f"統編： {spaced_digits(QUOTE_PROVIDER['company_id'])}",
+        f"地址： {spaced_text_numbers(QUOTE_PROVIDER['address'])}",
+        f"電話： {spaced_text_numbers(QUOTE_PROVIDER['phone'])}",
+        f"專案執行人： {spaced_text_numbers(str(data.get('executor', '') or '________________'))}",
+    ]
+    payment_lines = [
+        "付款方式",
+        f"戶名： {QUOTE_PROVIDER['account_name']}",
+        f"銀行名稱： {QUOTE_PROVIDER['bank_name']}",
+        f"銀行代號： {spaced_digits(QUOTE_PROVIDER['bank_code'])}",
+        f"戶頭： {spaced_digits(QUOTE_PROVIDER['account_number'])}",
+        f"分行名稱： {QUOTE_PROVIDER['branch_name']}",
+    ]
+    draw_lines(footer_x + 24, footer_y + 28, provider_lines, font=small_font, gap=34, color=muted)
+    text(footer_x + 24, footer_y + 28, provider_lines[0], font=body_font, color=brand)
+    draw_lines(footer_x + panel_w + 24, footer_y + 28, payment_lines, font=small_font, gap=38, color=muted)
+    text(footer_x + panel_w + 24, footer_y + 28, payment_lines[0], font=body_font, color=brand)
+    text(footer_x + panel_w * 2 + 24, footer_y + 28, "客戶用印處", font=body_font, color=brand)
+
+    buffer = BytesIO()
+    image.save(buffer, format="PDF", resolution=150.0)
     return buffer.getvalue()
 
 
